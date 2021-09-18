@@ -194,9 +194,7 @@
 							     collector))))
 				      
 			     (loop-finish)))
-				      
-					
-			  
+				      								  
 			  ;; otherwise we need to collect the value and return the correct lisp type
 			  
 			  (T
@@ -249,7 +247,12 @@
 				 (vector-push-extend c collector))))
 			    
 			    
-
+			     ((and (eq (length collector) 3)
+				   (equal "nul" (map 'string (lambda (x) x) collector))
+				   (char= c #\l))
+			      (progn
+				(setf rval nil)
+				(loop-finish)))
 			     ;; finally, if we are here just add our character to our collector
 			     (T
 			      (vector-push-extend c collector)))))) ;; just add the character to our collector
