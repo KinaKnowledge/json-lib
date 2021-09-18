@@ -1,4 +1,5 @@
 ;;;; package.lisp
 
 (defpackage #:json-lib
-  (:use #:cl))
+  (:use #:cl)
+  (:export :parse))
