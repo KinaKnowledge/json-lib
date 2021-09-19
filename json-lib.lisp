@@ -29,7 +29,9 @@
 (defconstant +in-key+ 8)
 
 
-(defun parse (json-text)
+(defun parse (json-text &key use-keywords-for-keys)
+  "Given an encoded JSON string, returns a Common Lisp structure or value.  If use-keywords-for-keys is T, then hash table keys
+   will be constructed as strings." 
   (let
       ((pos 0)
        (c nil)      
@@ -57,7 +59,7 @@
 		   (char= ch +tab+))		  
 	       T
 	       nil))
-	 
+	 ;; main recursive decode routine
 	 (read-obj (&optional (read-mode 0) (last-c nil))
 	   
 	     (let
@@ -108,7 +110,7 @@
 
 			  ((eq mode +in-key+)
 			   (let
-			       ((key (read-obj +in-string+)))			    
+			       ((key (read-obj +in-string+)))			     
 			     (cond
 			       ((and (or (typep key 'string)
 					 (typep key 'number))
@@ -163,7 +165,7 @@
 				   collector)
 			     (loop-finish)))
 
-			  ;; in pairs mode (JSON object, build pairs of objects in the collector, then
+			  ;; in pairs mode (JSON object), build pairs of objects in the collector, then
 			  ;; build a hash-table and return.
 			     
 
@@ -187,7 +189,10 @@
 							  value))
 					   (loop-finish)))
 					(T										 
-					 (setf k (read-obj +in-key+))					 			      
+					 (setf k (read-obj +in-key+))
+					 (when use-keywords-for-keys
+					   (setf k
+						 (alexandria:make-keyword (str:replace-all "_" "-" (str:upcase k)))))
 					 (setf v (read-obj))					 
 					 (setf pair (list k v))				
 					 (vector-push-extend pair
@@ -280,26 +285,4 @@
 			     
 
 
-			     
-			      
-			    
-       
-       
-   
-
-(defun read-next-object (separator delimiter
-                         &optional (input-stream *standard-input*))
-  (flet ((peek-next-char () (peek-char t input-stream t nil t))
-         (discard-next-char () (read-char input-stream t nil t)))    
-    (if (and delimiter (char= (peek-next-char) delimiter))			  
-        (progn
-          (discard-next-char)
-          nil)
-        (let* ((object (read input-stream t nil t))
-               (next-char (peek-next-char)))	  
-          (cond
-            ((char= next-char separator) (discard-next-char))	   
-            ((and delimiter (char= next-char delimiter)) nil)
-            (t (error "Unexpected next char: ~S" next-char)))
-          object))))
-
+	
