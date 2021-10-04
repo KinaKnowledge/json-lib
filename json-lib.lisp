@@ -17,6 +17,7 @@
 (defconstant +escape-char+ #\\)
 (defconstant +f-char+ #\f)
 (defconstant +t-char+ #\t)
+(defconstant +hyphen+ #\-)
 (defconstant +in-code+ 0)
 (defconstant +in-comment+ 1)
 (defconstant +in-quotes+ 2)
@@ -34,7 +35,7 @@
    will be constructed as strings." 
   (let
       ((pos 0)
-       (c nil)      
+       (c nil)
        (total-length (length json-text)))
     (labels
 	((next-char ()
@@ -45,7 +46,7 @@
 	 (peek-next-char ()
 	   (if (< pos total-length)
 	       (elt json-text pos)
-	       nil))
+	       nil))	 
 	 (raise-error (message)
 	   (error (format nil "pos: ~A: ~A: ~A*"
 		  pos
@@ -83,10 +84,14 @@
 		     do
 			(cond
 			  ((eq mode +in-string+)
-			   (progn
+			   (progn			    
 			     (cond
-			       ((char= c +quote+)				
-				(loop-finish))  ;; essentially return the collector
+			       ((and (char= c +quote+)
+				     (or (and (> pos 1)
+					      (not (char= (elt json-text (- pos 2)) +escape-char+)))
+					 (<= pos 1)))
+			       				 
+				 (loop-finish))  ;; essentially return the collector
 			       (T
 				(vector-push-extend c collector)))))
 
@@ -235,9 +240,11 @@
 			     ;; there are a few special cases, numbers and booleans, which we accomodate here
 			     ((eq (length collector) 0)
 			      (cond
-				((digit-char-p c) (progn						   
-						    (setf rval (read-obj +in-number+ c))						 
-						    (loop-finish)))
+				((or (digit-char-p c)
+				     (char= c +hyphen+))
+				 (progn						   
+				   (setf rval (read-obj +in-number+ c))						 
+				   (loop-finish)))
 						    
 				((char= c +f-char+) (progn
 						      (setf rval (read-obj +in-boolean+ c))						     
