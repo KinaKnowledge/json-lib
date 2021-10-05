@@ -30,23 +30,55 @@
 (defconstant +in-key+ 8)
 
 
-(defun parse (json-text &key use-keywords-for-keys)
+
+
+(defun lookup-escape (c)
+  (cond
+    ((char= c +escape-char+)
+     +escape-char+)
+    ((char= c #\n)
+     +new-line+)
+    ((char= c #\t)
+     +tab+)
+    ((char= c #\r)
+     #\Newline)
+    (T
+     nil)))
+    
+
+(defun parse (json-text &key use-keywords-for-keys trace)
   "Given an encoded JSON string, returns a Common Lisp structure or value.  If use-keywords-for-keys is T, then hash table keys
    will be constructed as strings." 
   (let
       ((pos 0)
        (c nil)
+       (escape-c nil)
+       (escape-mode 0)
        (total-length (length json-text)))
     (labels
 	((next-char ()
 	   (when (< pos total-length)
 	     (setf c (elt json-text pos))
+	     (if (char= c +escape-char+)
+		 (setf escape-mode 2)
+		 (decf escape-mode))
+	     (setf escape-mode (max escape-mode 0))
+	     (when trace
+	       (format T "~4D ~3D ~A~%"
+		       pos
+		       escape-mode
+		       c))
 	     (incf pos)
 	     c))
 	 (peek-next-char ()
 	   (if (< pos total-length)
 	       (elt json-text pos)
 	       nil))	 
+	 (add-escape-char (c collector)
+	   (progn
+	     (setf escape-c (lookup-escape c))
+	     (when escape-c
+	       (vector-push-extend escape-c collector))))
 	 (raise-error (message)
 	   (error (format nil "pos: ~A: ~A: ~A*"
 		  pos
@@ -85,14 +117,18 @@
 			(cond
 			  ((eq mode +in-string+)
 			   (progn			    
-			     (cond
+			     (cond			       
 			       ((and (char= c +quote+)
 				     (or (and (> pos 1)
 					      (not (char= (elt json-text (- pos 2)) +escape-char+)))
 					 (<= pos 1)))
 			       				 
-				 (loop-finish))  ;; essentially return the collector
-			       (T
+			 	(loop-finish))  ;; essentially return the collector
+			       ((= escape-mode 1)
+				(add-escape-char c collector))
+			       
+			       ;; just push it in
+			       ((= escape-mode 0)
 				(vector-push-extend c collector)))))
 
 			  ((eq mode +in-number+)
