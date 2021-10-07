@@ -42,6 +42,8 @@
      +tab+)
     ((char= c #\r)
      #\Newline)
+    ((char= c +quote+)
+     +quote+)
     (T
      nil)))
     
@@ -59,7 +61,8 @@
 	((next-char ()
 	   (when (< pos total-length)
 	     (setf c (elt json-text pos))
-	     (if (char= c +escape-char+)
+	     (if (and (< escape-mode 2)
+		      (char= c +escape-char+))
 		 (setf escape-mode 2)
 		 (decf escape-mode))
 	     (setf escape-mode (max escape-mode 0))
@@ -118,15 +121,17 @@
 			  ((eq mode +in-string+)
 			   (progn			    
 			     (cond			       
-			       ((and (char= c +quote+)
-				     (or (and (> pos 1)
-					      (not (char= (elt json-text (- pos 2)) +escape-char+)))
-					 (<= pos 1)))
-			       				 
-			 	(loop-finish))  ;; essentially return the collector
+			      
+				
+			       
+			       
+				;(add-escape-char c collector))
 			       ((= escape-mode 1)
 				(add-escape-char c collector))
-			       
+			       ((and (= escape-mode 0)
+				     (char= c +quote+))
+				(loop-finish))  ;; return the collector
+				
 			       ;; just push it in
 			       ((= escape-mode 0)
 				(vector-push-extend c collector)))))
