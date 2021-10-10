@@ -1,7 +1,30 @@
-;;;; JSON-Lib.lisp
+;;;; JSON-Lib
+;; A simple, relatively fast parser and encoder.
+;;
+;; Copyright 2021 Alex Nygren (Kina, LLC) kinaknowledge.com
+
+;; Permission is hereby granted, free of charge, to any person obtaining a copy
+;; of this software and associated documentation files (the "Software"), to
+;; deal in the Software without restriction, including without limitation the
+;; rights to use, copy, modify,  merge, publish, distribute, sublicense,
+;; and/or sell copies of the Software, and to permit persons to whom the
+;; Software is furnished to do so, subject to the following conditions:
+
+;; The above copyright notice and this permission notice shall be included
+;; in all copies or substantial portions of the Software.
+
+;; THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+;; IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+;; FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+;; THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+;; LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+;; FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+;; IN THE SOFTWARE.
+
 
 (in-package #:json-lib)
 
+;; CONSTANTS 
 
 (defconstant +left-bracket+ #\[)
 (defconstant +right-bracket+ #\])
@@ -28,8 +51,6 @@
 (defconstant +in-pairs+ 6)
 (defconstant +in-boolean+ 7)
 (defconstant +in-key+ 8)
-
-
 
 
 (defun lookup-escape (c)
@@ -329,8 +350,116 @@
 	       rval)))
       
       (read-obj))))
-		  
-			     
 
 
+;; Encoders ---------------------------------
+
+;; Main entry
+
+(defun stringify (data &key (case-encoder #'lisp-to-snakecase) unencodable-items)
+  "Converts the given data structure to a stringified JSON form, suitable for serialization and other uses.
+   An optional function can be passed for case encoding of native lisp keyword structures.
+   If a function for unencodable-items is provided, this function will be called, and should return a JSON 
+   compliant string representing the encoded items. If no value is provided for unencodable-items, the 
+   JSON null value is used."
+  (encode-entry data case-encoder unencodable-items))
+
+
+;; The central dispatcher
+;; Simple types are handled directly otherwise they have specific
+;; handlers
+
+(defun encode-entry (entry &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
+  (cond
+    ((typep entry 'STRING)
+     (write-to-string entry))
+    ((typep entry 'KEYWORD)
+     (write-to-string (keyword-to-string entry case-encoder)))
+    ((typep entry 'NUMBER)
+     (write-to-string entry))    
+    ((typep entry 'NULL)
+     "null")
+    ((typep entry 'BOOLEAN)
+     "true")
+    ((typep entry 'HASH-TABLE)
+     (encode-hash-table entry case-encoder unencodable-items))
+    ((typep entry 'LIST)
+     (encode-list entry case-encoder unencodable-items))
+    ((typep entry 'VECTOR)
+     (encode-vector entry case-encoder unencodable-items))
+    (T
+     (if unencodable-items
+	 (let
+	     ((encoded-value (funcall unencodable-items)))
+	   (if (typep encoded-value 'string)
+	       encoded-value
+	       (error (format nil "non-string value returned from unencodable-items: ~A"
+			      (type-of encoded-value)))))
+	 "null"))))
+
+
+(defun lisp-to-snakecase (text)
+  (str:replace-all "-" "_" text))
+
+(defun snakecase-to-lisp (text)
+  (str:replace-all "_" "-" text))
+
+(defun lisp-to-camelcase (text)
+  (let
+      ((comps (str:split "-" text)))
+    (apply #'concatenate 'string
+		 (first comps)
+		 (mapcar #'str:capitalize (rest comps)))))
+
+(defun keyword-to-string (kw &optional (case-encoder #'lisp-to-snakecase))
+ (funcall case-encoder
+	  (str:downcase (format nil "~A" kw))))
+
+
+;; Container Encoding
+;; Vectors and Arrays, Lists and Hash Tables
+
+
+(defun encode-vector(vect &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
+  (let
+      ((encoded-items nil))
+    (setf encoded-items
+	  (loop for entry across vect
+		collect (encode-entry entry case-encoder unencodable-items)))
+    (str:concat "["
+		(str:join ", " encoded-items)
+		"]")))
+
+(defun encode-list (items &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
+  (let
+      ((encoded-items nil))
+    (setf encoded-items
+	  (loop for entry in items
+		collect (encode-entry entry case-encoder unencodable-items)))
+    (str:concat "["
+		(str:join ", " encoded-items)
+		"]")))
+  
+
+
+(defun encode-hash-table (table &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
+  (let
+      ((encoded-values nil))        
+    (setf encoded-values
+	  (loop for k being the hash-keys of table
+		  using (hash-value v)
+		collect
+		(list (encode-entry k case-encoder unencodable-items)
+		      (encode-entry v))))
+    
+    (str:concat "{"
+		(if (> (length encoded-values) 0)
+		    (str:join ", "
+			      (loop for (k v) in encoded-values
+				    collect (str:concat k ": " v)))
+		    "")
+		"}")))
+   
+		   
+		
 	

@@ -2,4 +2,4 @@
 
 (defpackage #:json-lib
   (:use #:cl)
-  (:export :parse))
+  (:export :parse :stringify))
