@@ -30,4 +30,5 @@
   :serial t
   :depends-on (#:alexandria #:str #:parse-float)
   :components ((:file "package")
+	       (:file "tests/compliance")
                (:file "json-lib")))

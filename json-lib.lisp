@@ -38,9 +38,13 @@
 (defconstant +new-line+ #\Linefeed)
 (defconstant +period+ #\.)
 (defconstant +escape-char+ #\\)
+(defconstant +forward-slash+ #\/)
 (defconstant +f-char+ #\f)
 (defconstant +t-char+ #\t)
 (defconstant +hyphen+ #\-)
+(defconstant +e+ #\e)
+(defconstant +CAP-E+ #\E)
+(defconstant +plus+ #\+)
 (defconstant +in-code+ 0)
 (defconstant +in-comment+ 1)
 (defconstant +in-quotes+ 2)
@@ -52,6 +56,8 @@
 (defconstant +in-boolean+ 7)
 (defconstant +in-key+ 8)
 
+(defvar *max-depth* 1000)
+(defvar *max-exp-length* 2)
 
 (defun lookup-escape (c)
   (cond
@@ -70,13 +76,14 @@
     
 
 (defun parse (json-text &key use-keywords-for-keys trace)
-  "Given an encoded JSON string, returns a Common Lisp structure or value.  If use-keywords-for-keys is T, then hash table keys
+  "Given an encoded UTF-8 JSON string, returns a Common Lisp structure or value.  If use-keywords-for-keys is T, then hash table keys
    will be constructed as strings." 
   (let
       ((pos 0)
        (c nil)
        (escape-c nil)
        (escape-mode 0)
+       (depth 0)
        (total-length (length json-text)))
     (labels
 	((next-char ()
@@ -87,11 +94,7 @@
 		 (setf escape-mode 2)
 		 (decf escape-mode))
 	     (setf escape-mode (max escape-mode 0))
-	     (when trace
-	       (format T "~4D ~3D ~A~%"
-		       pos
-		       escape-mode
-		       c))
+	     
 	     (incf pos)
 	     c))
 	 (peek-next-char ()
@@ -127,9 +130,13 @@
 		  (str-val nil)
 		  (mode read-mode)
 		  (rval nil)
-		  (is-float? nil))	       
+		  (exponent-present nil)
+		  (is-float? nil))
+	       (incf depth)
 	       (when last-c
 		 (vector-push-extend last-c collector))
+	       (when (> depth *max-depth*)
+		 (raise-error "recursive parse depth exceeded *max-depth*"))
 	       (loop for c = (cond
 			       ((or (eq mode +in-array+)
 				    (eq mode +in-pairs+)
@@ -138,15 +145,21 @@
 			       (T
 				(next-char)))
 		     do
-			(cond
+			(when trace
+			  (format T "~4D ~5D ~2D ~3D ~A~%"
+				  pos
+				  depth
+				  escape-mode
+				  mode
+				  c)
+			  (sleep 0.2))
+			(cond			  
 			  ((eq mode +in-string+)
 			   (progn			    
 			     (cond			       
-			      
-				
-			       
-			       
 				;(add-escape-char c collector))
+			       ((null c)
+				(raise-error "unclosed string"))
 			       ((= escape-mode 1)
 				(add-escape-char c collector))
 			       ((and (= escape-mode 0)
@@ -159,6 +172,8 @@
 
 			  ((eq mode +in-number+)
 			   (cond
+			     ((null c)
+			      (loop-finish))
 			     ((delimiter? c)
 			      (progn
 				(next-char)
@@ -166,12 +181,28 @@
 			     ((or (char= c +right-bracket+)
 				  (char= c +right-brace+))
 			      (loop-finish))
-			     ((digit-char-p c)				 
-			      (vector-push-extend (next-char) collector))
+			     ((digit-char-p c)
+			      (progn
+				(when (and exponent-present
+					   (> (- (length collector) exponent-present) *max-exp-length*))
+				  (raise-error "exponent too large"))
+				(vector-push-extend (next-char) collector)))
+			     ((or (char= c +e+)
+				  (char= c +CAP-E+))
+			      (progn
+				(next-char)
+				(vector-push-extend +CAP-E+ collector)
+				(setf exponent-present (length collector))))				
 			     ((char= c +period+)
 			      (progn
 				(vector-push-extend (next-char) collector)
-				(setf is-float? T)))			     
+				(setf is-float? T)))
+			     ((and (or (char= c +hyphen+)
+				       (char= c +plus+))
+				   (> (length collector) 0)
+				   (or (char= +e+ (elt collector (- (length collector) 1)))
+				       (char= +CAP-E+ (elt collector (- (length collector) 1)))))
+			      (vector-push-extend (next-char) collector))
 			     (T
 			      (raise-error "invalid char - expected digit"))))
 
@@ -181,6 +212,7 @@
 			     (cond
 			       ((and (or (typep key 'string)
 					 (typep key 'number))
+				     (not (null (peek-next-char)))
 				     (char= (peek-next-char) +colon+))
 				(progn
 				  (next-char) ;; grab the colon and return the key				  
@@ -194,6 +226,8 @@
 
 			  ((eq mode +in-boolean+)
 			   (progn
+			     (when (null c)
+			       (raise-error "invalid nil"))
 			     (vector-push-extend c collector)			    
 			     (cond			       
 			       ((< (length collector) 4)
@@ -220,6 +254,8 @@
 				   do
 				      				    
 				      (cond					
+					((null ch)
+					 (raise-error "invalid nil"))
 					((char= ch +right-bracket+)
 					 (progn
 					   (next-char)  ;; consume the ] to account for it					
@@ -242,8 +278,10 @@
 				   with pair = nil
 				   with k = nil
 				   with v = nil
-				   do				      
+				   do				      				      				      
 				      (cond
+					((null ch)
+					 (raise-error "invalid nil"))
 					((delimiter? ch)					 
 					 (next-char))
 					((char= ch +right-brace+)
@@ -254,7 +292,7 @@
 						 do
 						    (setf (gethash key rval)
 							  value))
-					   (loop-finish)))
+					   (loop-finish)))					
 					(T										 
 					 (setf k (read-obj +in-key+))
 					 (when use-keywords-for-keys
@@ -270,10 +308,10 @@
 			  ;; otherwise we need to collect the value and return the correct lisp type
 			  
 			  (T
-			   (cond
+			   (cond			    
 			     ((delimiter? c)
-			      (progn				
-				(setf rval (map 'string (lambda (x) x) collector))
+			      (progn			
+				(setf rval (map 'string (lambda (x) x) collector))			
 				(cond
 				  ((equal rval "null")
 				   (progn
@@ -281,7 +319,10 @@
 				    (loop-finish)))
 				  ((> (length collector) 0)
 				   (raise-error (format nil "invalid symbol: ~A" rval)))
-				  ((eq 0 (length collector))
+				  ((and (null c)
+				        (= 0 (length collector)))
+				   (loop-finish))
+				  ((= 0 (length collector))
 				   nil)
 				  (T				   
 				   (loop-finish)))))
@@ -303,7 +344,8 @@
 			     ((eq (length collector) 0)
 			      (cond
 				((or (digit-char-p c)
-				     (char= c +hyphen+))
+				     (char= c +hyphen+)
+				     (char= c +plus+))
 				 (progn						   
 				   (setf rval (read-obj +in-number+ c))						 
 				   (loop-finish)))
@@ -340,13 +382,15 @@
 		  (setf rval nil))
 		 ((not (null rval)) rval)
 		 ((and (eq mode +in-number+)
-		       is-float?)
+		       (or is-float?
+			   exponent-present))
 		  (setf rval (parse-float:parse-float (map 'string (lambda (x) x) collector))))
 		 ((eq mode +in-number+)
 		  (progn		    
 		    (setf rval (parse-integer (map 'string (lambda (x) x) collector)))))
 		 (T
-		  (setf rval (map 'string (lambda (x) x) collector))))	       
+		  (setf rval (map 'string (lambda (x) x) collector))))
+	       (decf depth)
 	       rval)))
       
       (read-obj))))
