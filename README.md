@@ -1,9 +1,9 @@
 # JSON-Lib
-### _Alex Nygren_
+### JSON Parser and Serializer For Common Lisp
 
 This is a simple json decoder and encoder that maps from JSON to Common Lisp and vice versa.  The mappings are described in the following table.  It strives to ensure no loss of fidelity in conversions of structured data between the two forms of representation.  
 
-### Table 1: Mappings 
+### Mappings 
 
 | JSON            | Common Lisp   |
 |-----------------|---------------|
@@ -22,9 +22,10 @@ This is a simple json decoder and encoder that maps from JSON to Common Lisp and
 
 This library has two primary functions: `parse`, which takes a UTF-8 encoded JSON string and builds a representation of the structure in Common Lisp, and `stringify`, which takes a Common Lisp input structure and returns an output JSON string.  
 
+
 |FUNCTION      | INPUT                 | OUTPUT                     |
 |--------------|-----------------------|----------------------------|
-|PARSE         | UTF-8 Encoded Strings | Common Lisp (see Table 1)  |
+|PARSE         | UTF-8 Encoded Strings | Common Lisp (see Mappings) |
 |STRINGIFY     | Common Lisp           | Common Lisp String         |
 
 
