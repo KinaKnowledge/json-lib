@@ -51,7 +51,8 @@
 
 (defun dlog (&rest args)
   (when *verbose-mode*
-    (format T "~A ~A~%" (tstring) (apply #'format nil args))))
+    (ignore-errors   ;; avoiding any messiness with converted values not being able to be displayed.
+     (format T "~A ~A~%" (tstring) (apply #'format nil args)))))
 
 (defun get-tests (&key test-directory github-repo-url)
   (let*
@@ -156,7 +157,7 @@
 			 (format nil "~A" (first status))
 			 (second status)
 			 (third status)))
-
+	     
 	     (dlog "~4D/~D: ~45A: [ ~A ] ~A"
 		   count
 		   total-count
