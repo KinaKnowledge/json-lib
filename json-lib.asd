@@ -28,7 +28,7 @@
   :license  "MIT"
   :version "0.8"
   :serial t
-  :depends-on (#:alexandria #:str #:parse-float)
+  :depends-on (#:alexandria #:str #:parse-float #:cl-fad)
   :components ((:file "package")
 	       (:file "tests/compliance")
                (:file "json-lib")))
