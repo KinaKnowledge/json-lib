@@ -77,7 +77,7 @@
      nil)))
     
 
-(defun parse (json-text &key use-keywords-for-keys trace (max-depth 1000) (max-exponent-length 2))
+(defun parse (json-text &key use-keywords-for-keys trace (max-depth 1000) (max-exponent-length 2) object-key-handler)
   "Given an encoded UTF-8 JSON string, returns a Common Lisp structure or value.  
    If use-keywords-for-keys is T, then hash table keys will be constructed as keywords. 
    By default the limit is 1000 for structural depth, but this can be set with the keyword
@@ -158,7 +158,7 @@
 				  escape-mode
 				  mode
 				  c)
-			  (sleep 0.2))
+			  (sleep 0.0))
 			(cond			  
 			  ((eq mode +in-string+)
 			   (progn			    
@@ -326,9 +326,13 @@
 					   (loop-finish)))					
 					(T										 
 					 (setf k (read-obj +in-key+))
-					 (when use-keywords-for-keys
-					   (setf k
-						 (alexandria:make-keyword (str:replace-all "_" "-" (str:upcase k)))))
+					 (cond
+					   (use-keywords-for-keys
+					    (setf k
+						  (alexandria:make-keyword (str:replace-all "_" "-" (str:upcase k)))))
+					   (object-key-handler
+					    (setf k
+						  (funcall object-key-handler k))))
 					 (setf v (read-obj))					 
 					 (setf pair (list k v))				
 					 (vector-push-extend pair
@@ -457,11 +461,11 @@
     ((typep entry 'NULL)
      "null")
     ((typep entry 'BOOLEAN)
-     "true")
+     "true")    
     ((typep entry 'HASH-TABLE)
-     (encode-hash-table entry case-encoder unencodable-items))
+     (encode-hash-table entry case-encoder unencodable-items))  
     ((typep entry 'LIST)
-     (encode-list entry case-encoder unencodable-items))
+     (encode-list entry case-encoder unencodable-items))   
     ((typep entry 'VECTOR)
      (encode-vector entry case-encoder unencodable-items))
     (T
@@ -473,7 +477,6 @@
 	       (error (format nil "non-string value returned from unencodable-items: ~A"
 			      (type-of encoded-value)))))
 	 "null"))))
-
 
 (defun lisp-to-snakecase (text)
   (str:snake-case text))
