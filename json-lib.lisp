@@ -80,6 +80,8 @@
 (defun parse (json-text &key use-keywords-for-keys trace (max-depth 1000) (max-exponent-length 2) object-key-handler)
   "Given an encoded UTF-8 JSON string, returns a Common Lisp structure or value.  
    If use-keywords-for-keys is T, then hash table keys will be constructed as keywords. 
+   If an object-key-handler lambda/function is provided, this will be called for each object key and the result
+   value used for the specific object key.
    By default the limit is 1000 for structural depth, but this can be set with the keyword
    max-depth. Exponent representation in serialized form is limited to a length of 2 to prevent huge values
    causing slow downs and other issues in the conversion process." 
