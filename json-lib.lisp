@@ -498,33 +498,40 @@
   (let
       ((collector (make-array (length text) :initial-element +quote+  :element-type 'character :adjustable T :fill-pointer 1))
        (cnum nil))
-    (loop for c across text
-	  do
-	     (setf cnum
-		   (char-code c))
-	     (if (< cnum 32)
-		 ;; if it is a special char, encode it appropriately, otherwise discard it
-		 (cond
-		   ((= cnum 10)
-		    (progn
-		      (vector-push-extend +escape-char+ collector)
-		      (vector-push-extend #\n collector)))
-		   ((= cnum 9)
-		    (progn
-		      (vector-push-extend +escape-char+ collector)
-		      (vector-push-extend #\t collector)))
-		   ((= cnum 12)
-		    (progn
-		      (vector-push-extend +escape-char+ collector)
-		      (vector-push-extend #\f collector)))
-		    ((= cnum 13)
-		    (progn
-		      (vector-push-extend +escape-char+ collector)
-		      (vector-push-extend #\r collector))))		    
-		    
-		 (vector-push-extend c collector)))
-    (vector-push-extend +quote+ collector)
-    (map 'string (lambda (x) x) collector)))
+    (if (= (length text) 0)
+	"\"\""
+	(progn
+	  (loop for c across text
+	      do
+		 (setf cnum
+		       (char-code c))
+		 (if (char= c +quote+)
+		     (progn
+		       (vector-push-extend +escape-char+ collector)
+		       (vector-push-extend +quote+ collector))
+		     (if (< cnum 32)
+			 ;; if it is a special char, encode it appropriately, otherwise discard it
+			 (cond
+			   ((= cnum 10)
+			    (progn
+			      (vector-push-extend +escape-char+ collector)
+			      (vector-push-extend #\n collector)))
+			   ((= cnum 9)
+			    (progn
+			      (vector-push-extend +escape-char+ collector)
+			      (vector-push-extend #\t collector)))
+			   ((= cnum 12)
+			    (progn
+			      (vector-push-extend +escape-char+ collector)
+			      (vector-push-extend #\f collector)))
+			   ((= cnum 13)
+			    (progn
+			      (vector-push-extend +escape-char+ collector)
+			      (vector-push-extend #\r collector))))			      			 
+			 (vector-push-extend c collector))))
+	  (vector-push-extend +quote+ collector)    	  
+	  (babel:octets-to-string (babel:string-to-octets collector) :encoding :utf-8)))))
+;;    (map 'string (lambda (x) x) collector)))
 		     
 		    
 	       
