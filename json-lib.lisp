@@ -73,6 +73,8 @@
      #\Newline)
     ((char= c +quote+)
      +quote+)
+    ((char= c +forward-slash+)
+     +forward-slash+)
     (T
      nil)))
     
