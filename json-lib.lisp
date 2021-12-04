@@ -511,7 +511,8 @@
 		     (progn
 		       (vector-push-extend +escape-char+ collector)
 		       (vector-push-extend +quote+ collector))
-		     (if (< cnum 32)
+		     (if (or (< cnum 32)
+			     (= cnum 92))
 			 ;; if it is a special char, encode it appropriately, otherwise discard it
 			 (cond
 			   ((= cnum 10)
@@ -529,7 +530,11 @@
 			   ((= cnum 13)
 			    (progn
 			      (vector-push-extend +escape-char+ collector)
-			      (vector-push-extend #\r collector))))			      			 
+			      (vector-push-extend #\r collector)))
+			   ((= cnum 92)
+			    (progn
+			      (vector-push-extend +escape-char+ collector)
+			      (vector-push-extend +escape-char+ collector))))			      			 
 			 (vector-push-extend c collector))))
 	  (vector-push-extend +quote+ collector)    	  
 	  (babel:octets-to-string (babel:string-to-octets collector) :encoding :utf-8)))))
