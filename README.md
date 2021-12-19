@@ -67,7 +67,9 @@ This will output a string as follows:
 This library is fairly forgiving from a parsing standpoint.  Particularly, in parsing JSON, and in contrast with the JSON spec,
 commas are not required to delimit input JSON.  The parser uses whitespace presence, regardless of commas, as a delimiting marker.
 
-Compliance is measured to the [JSONTestSuite](https://github.com/nst/JSONTestSuite) Github repository tests.  The (tests/compliance.lisp) has a function `build-parser-test-harness` that will clone the JSONTestSuite repo into a subfolder in your current working directory and report out to STDOUT the validation results, plus returns a hashtable.  A copy of the output will be added to this repo as a reference guide.
+Compliance is measured to the [JSONTestSuite](https://github.com/nst/JSONTestSuite) Github repository tests.  The (tests/compliance.lisp) has a function `build-parser-test-harness` that will clone the JSONTestSuite repo into a subfolder in your current working directory and report out to STDOUT the validation results, plus returns a hashtable. 
+
+See the [current compliance](compliance.html) for specifics.  This file can be generated with `(build-parser-test-harness :write-compliance-html-file "compliance.html")`.
 
 ## License
 
