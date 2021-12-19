@@ -54,6 +54,7 @@
     (ignore-errors   ;; avoiding any messiness with converted values not being able to be displayed.
      (format T "~A ~A~%" (tstring) (apply #'format nil args)))))
 
+
 (defun get-tests (&key test-directory github-repo-url)
   (let*
       ((repo (or github-repo-url *json-test-repo*))       
@@ -90,26 +91,39 @@
 		  nil)))))))
 	    
 
-(defun build-parser-test-harness (&key test-directory github-repo-url show-input)
+(defun build-parser-test-harness (&key test-directory github-repo-url show-input write-compliance-html-file)
   (let
       ((parser-tests (get-tests :test-directory test-directory :github-repo-url github-repo-url)) ;; ensure the tests are there
        (test-results (make-hash-table :test 'equal))
        (all-parse-tests nil)
+       (outstream nil)
        (total-count 0))
     (when (null parser-tests)
       (error "Unable to find the tests: check repo access and directory structure."))
 
+    
+    
     (setf all-parse-tests
 	  (uiop:directory-files parser-tests)
 	  total-count
 	  (length all-parse-tests))
     
+    ;; If a filename is provided use that otherwise if the user just put T, write the default "compliance.html"
+    
+    (when write-compliance-html-file
+      (setf outstream
+	    (create-result-page (or (and (typep write-compliance-html-file 'string)
+					 write-compliance-html-file)
+				    "compliance.html")))
+      (emit-result-table-header outstream))
+    ;(format T "outstream: ~A~%" outstream)
     (loop for file in all-parse-tests 
 	  for count from 1
 	  with result = nil
 	  with expected-to-pass = nil 
 	  with fail = nil
 	  with status = nil
+	  with input = nil
 	  with status-symbol = nil
 	  with test-name = nil
 	  do
@@ -120,15 +134,19 @@
 	           expected-to-pass
 		   (str:starts-with? "y_" test-name))
 	    
-
+	     (when (or outstream show-input)
+	       (setf input
+		     (ignore-errors
+		      (alexandria:read-file-into-string file :external-format :utf8))))
+	     
 	     ;; run the test
 	     (when show-input
 	       (dlog "~4D/~D: ~40A: running: ~A"
 		     count
 		     total-count
 		     test-name
-		     (ignore-errors
-		      (alexandria:read-file-into-string file :external-format :utf8))))
+		     input))
+	     
 	     (handler-case		 
 		 (setf result (parse (alexandria:read-file-into-string file :external-format :utf8)))
 	       (error (e)		 
@@ -163,12 +181,121 @@
 		   total-count
 		   (first status)
 		   status-symbol
-		   (second status)))
+		   (second status))
+	     (when outstream
+	       (emit-result-row outstream count total-count (first status) status-symbol (second status) input)))
+    (when outstream
+      (emit-result-table-footer outstream)
+      (close-result-page outstream))
     test-results))
-		    
-	      
-		   
-	     
+
+(defun create-result-page (output-html-file)
+  "This function creates an HTML output table showing the results of compliance to the JSON Test Suite.
+   Pass a file path that is in a writable location.  Be sure to close the result by calling close_result_page."
+  (let
+      ((outstream (open output-html-file :direction :output :if-exists :supersede :external-format :utf8)))   
+      (format outstream
+	      "<html><head><title>JSON-Lib Compliance to JSON Test Suite</title><style>td { padding: 5px;  } .even { background: #F3F2F2; } .odd { background: #FAFAFA; }</style></head><body>~%")
+    (format outstream
+	    (str:join " "
+		      (list "<h3>JSON LIb Compliance to the JSON Test Suite</h3>"
+			    "Generated:"
+			    (tstring)
+			    "<p>These tests are sourced from the <a href='https://github.com/nst/JSONTestSuite'>JSON Test Suite</a> repository."
+			    "<ul>"
+			    "<li>Tests that are prefixed with N indicate that the execution of these tests should result in a parse error.  Therefore"
+			    "these tests are considered passing when the parser indicates an error.</li>"
+			    "<li>Tests that are prefixed with Y indicate that these tests are considered passing when they successfully decode the serialized JSON.</li>"
+			    "<li>Tests that are prefied with I are indeterminate, and these are not marked as pass/fail, but if they suceed are marked as OK, or ERR if"
+			    "an error is encountered during their execution.</li></ul></p>"
+			    "<p>The JSON-LIB library is intentionally not compliant with respect to delimiting commas: commas are optional as a delimiter. Tests"
+			    "that look for compliance to delimiting commas will not pass. See README for more details.</p>"
+
+			    )))
+	    
+    outstream))
+
+(defun close-result-page (outstream)
+  (progn
+    (format outstream
+	    "</body></html>~%")
+    (close outstream)))
+    
+    
+
+(defun emit-result-table-header (fstream)
+  (progn
+    (format fstream
+	    "<table>~% <thead><tr><th>Test #</th><th>Total Tests</th><th>Test Description</th><th>Result</th><th>Output (if any)</th></thead>~%")
+    (format fstream
+	    " <tbody>~%")))
+
+(defun emit-result-table-footer (fstream)
+  (format fstream
+	  " </tbody>~%</table>"))
+
+(defun emit-result-row (fstream count total-count test-name result test-output input)
+  (handler-case
+      (format fstream
+	      "  <tr ~A><td>~D</td><td>~D</td><td>~A</td>~A<td>~A</td></tr>~%"
+	      (if (eq (mod count 2) 0)
+		  "class='even'"
+		  "class='odd'")
+	      count
+	      total-count
+	      (format nil "<details><summary>~A</summary><code>~S</code></details>~%"
+		      test-name
+		      input)
+	      (cond
+		((equal "PASS" result)		    
+		 (format nil "<td style='background: #00FF0020;'>~A</td>" result))
+		((equal "OK  " result)
+		 (format nil "<td style='background: #00a2f057;'>~A</td>" result))
+		((equal "FAIL" result)
+		 (format nil "<td style='background: #FF000020;'>~A</td>" result))
+		(T
+		 (format nil "<td style='background: #00a2f0a6;'>~A</td>" result)))
+	      (format nil "<details><summary><code>~A</code></summary><code>~A</code></details>~%"
+		      (cond
+			((typep test-output 'SIMPLE-ERROR)
+			 (format nil "ERROR"))
+			((typep test-output 'hash-table)
+			 (format nil "HASH-TABLE count: ~A" (hash-table-count test-output)))
+			((typep test-output 'string)
+			 (format nil "STRING length: ~A" (length test-output)))
+			((typep test-output 'array)
+			 (format nil "VECTOR length: ~A" (length test-output)))
+			((or (eq 'BOOLEAN (type-of test-output))
+			     (typep test-output 'number))
+			 (format nil "~A: ~A" (type-of test-output) test-output))
+			(T
+			 (format nil "~A" (type-of test-output))))
+		      (if (typep test-output 'SIMPLE-ERROR)
+			  (format nil "ERROR: ~A" test-output)
+			  (handler-case
+			      (stringify test-output)
+			    (error ()
+			      "Unable to display")))))			  	
+    (error ()
+      (format fstream
+	      "  <tr><td>~D</td><td>~D</td><td>~A</td>~A<td>~A</td></tr>~%"
+	      count
+	      total-count
+	      (format nil "<details><summary>~A</summary><code>~A</code></details>~%"
+		      test-name
+		      input)
+	      (cond
+		((equal "PASS" result)		    
+		 (format nil "<td style='background: #00FF0020;'>~A</td>" result))
+		((equal "OK  " result)
+		 (format nil "<td style='background: #00a2f057'>~A</td>" result))
+		((equal "FAIL" result)
+		 (format nil "<td style='background: #FF000020;'>~A</td>" result))
+		(T
+		 (format nil "<td style='background: #00a2f0a6;'>~A</td>" result)))
+	      "-"))))
+
+
 	     
 		   
 	  
