@@ -1,7 +1,9 @@
 # JSON-Lib
 ### JSON Parser and Serializer For Common Lisp
 
-This is a simple json decoder and encoder that maps from JSON to Common Lisp and vice versa.  The mappings are described in the following table.  It strives to ensure no loss of fidelity in conversions of structured data between the two forms of representation.  
+This is a simple json decoder and encoder that maps from JSON to Common Lisp and vice versa.  The mappings are described in the following table.  It strives to ensure no loss of fidelity in conversions of structured data between the two forms of representation.
+
+This library has been tested to work with SBCL and CCL.
 
 ### Mappings 
 
@@ -69,7 +71,7 @@ commas are not required to delimit input JSON.  The parser uses whitespace prese
 
 Compliance is measured to the [JSONTestSuite](https://github.com/nst/JSONTestSuite) Github repository tests.  The (tests/compliance.lisp) has a function `build-parser-test-harness` that will clone the JSONTestSuite repo into a subfolder in your current working directory and report out to STDOUT the validation results, plus returns a hashtable. 
 
-See the [current compliance](compliance.html) for specifics.  This file can be generated with `(build-parser-test-harness :write-compliance-html-file "compliance.html")`.
+See the [current SBCL compliance](tests/compliance-sbcl.html) for specifics on SBCL and [current CCL compliance](tests/compliance-ccl.html) for CCL.  This file can be generated with `(build-parser-test-harness :write-compliance-html-file "compliance.html")`.
 
 ## License
 
