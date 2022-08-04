@@ -60,7 +60,6 @@
 
 
 
-
 (defun lookup-escape (c)
   (cond
     ((char= c +escape-char+)
