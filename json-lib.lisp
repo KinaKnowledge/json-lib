@@ -470,7 +470,10 @@
     ((typep entry 'BOOLEAN)
      "true")    
     ((typep entry 'HASH-TABLE)
-     (encode-hash-table entry case-encoder unencodable-items))  
+     (encode-hash-table entry case-encoder unencodable-items))
+    ((and (typep entry 'LIST)
+	  (not (typep  (rest entry) 'CONS)))
+     (encode-cons entry case-encoder unencodable-items))
     ((typep entry 'LIST)
      (encode-list entry case-encoder unencodable-items))   
     ((typep entry 'VECTOR)
@@ -570,7 +573,16 @@
 		(str:join ", " encoded-items)
 		"]")))
   
-
+(defun encode-cons (items &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
+  (let
+      ((encoded-items nil))
+    (setf encoded-items
+	  (list (encode-entry (first items) case-encoder unencodable-items)
+		(encode-entry (rest items) case-encoder unencodable-items)))
+    (str:concat "["
+		(str:join ", " encoded-items)
+		"]")))
+	 
 
 (defun encode-hash-table (table &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
   (let
