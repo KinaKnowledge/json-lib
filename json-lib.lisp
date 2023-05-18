@@ -213,7 +213,8 @@
 				(next-char)
 				(loop-finish)))
 			     ((or (char= c +right-bracket+)
-				  (char= c +right-brace+))
+				  (char= c +right-brace+)
+				  (char= c +colon+))
 			      (loop-finish))
 			     ((digit-char-p c)
 			      (progn
@@ -242,7 +243,10 @@
 
 			  ((eq mode +in-key+)
 			   (let
-			       ((key (read-obj +in-string+)))			     
+			       ((key  (if (char= +quote+ c)
+					  (read-obj +in-string+)
+					  (read-obj +in-number+)
+					  )))			    
 			     (cond
 			       ((and (or (typep key 'string)
 					 (typep key 'number))
@@ -453,7 +457,7 @@
 ;; Simple types are handled directly otherwise they have specific
 ;; handlers
 
-(defun encode-entry (entry &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
+(defun encode-entry (entry &optional (case-encoder #'lisp-to-snakecase) unencodable-items)  
   (cond
     ((typep entry 'STRING)
      (encode-string entry))
@@ -470,10 +474,10 @@
     ((typep entry 'BOOLEAN)
      "true")    
     ((typep entry 'HASH-TABLE)
-     (encode-hash-table entry case-encoder unencodable-items))        
-    ;((and (typep entry 'LIST)
-;	  (not (typep  (rest entry) 'CONS)))
- ;    (encode-cons entry case-encoder unencodable-items))
+     (encode-hash-table entry case-encoder unencodable-items))
+    ((and (typep entry 'LIST)
+	  (not (typep  (rest entry) 'CONS)))
+     (encode-cons entry case-encoder unencodable-items))    
     ((typep entry 'LIST)
      (encode-list entry case-encoder unencodable-items))
     ((typep entry 'VECTOR)
@@ -501,6 +505,12 @@
 (defun keyword-to-string (kw &optional (case-encoder #'lisp-to-snakecase))
  (funcall case-encoder
 	  (str:downcase (format nil "~A" kw))))
+
+(defun string-to-symbol (text &key (case-encoder #'snakecase-to-lisp) package)
+  (if package
+      (intern (str:upcase (funcall case-encoder text))
+	      package)
+       (intern (str:upcase (funcall case-encoder text)))))
 
 (defun encode-string (text)
   (let
@@ -558,7 +568,7 @@
       ((encoded-items nil))
     (setf encoded-items
 	  (loop for entry across vect
-		collect (encode-entry entry case-encoder unencodable-items)))
+		collect (encode-entry entry case-encoder unencodable-items)))    
     (str:concat "["
 		(str:join ", " encoded-items)
 		"]")))
@@ -568,10 +578,13 @@
       ((encoded-items nil))
     (setf encoded-items
 	  (loop for entry in items
-		collect (encode-entry entry case-encoder unencodable-items)))
+		collect 
+		(encode-entry entry case-encoder unencodable-items)))    
     (str:concat "["
 		(str:join ", " encoded-items)
 		"]")))
+
+
   
 (defun encode-cons (items &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
   (let
@@ -582,18 +595,18 @@
     (str:concat "["
 		(str:join ", " encoded-items)
 		"]")))
-	 
+	
 
 (defun encode-hash-table (table &optional (case-encoder #'lisp-to-snakecase) unencodable-items)
   (let
-      ((encoded-values nil))        
+      ((encoded-values nil))
+    
     (setf encoded-values
 	  (loop for k being the hash-keys of table
 		  using (hash-value v)
 		collect
 		(list (encode-entry k case-encoder unencodable-items)
-		      (encode-entry v))))
-    
+		      (encode-entry v))))   
     (str:concat "{"
 		(if (> (length encoded-values) 0)
 		    (str:join ", "
